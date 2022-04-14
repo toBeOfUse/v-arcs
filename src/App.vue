@@ -227,6 +227,13 @@ export default defineComponent({
   font-weight: normal;
   font-style: normal;
 }
+@font-face {
+  font-family: "LivvicRegular";
+  src: url("./assets/livvic-regular-webfont.woff2") format("woff2"),
+    url("./assets/livvic-regular-webfont.woff") format("woff");
+  font-weight: normal;
+  font-style: normal;
+}
 * {
   box-sizing: border-box;
 }
@@ -234,6 +241,7 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
   align-items: center;
+  font-family: LivvicRegular, sans-serif;
 }
 #canvas-container {
   position: relative;
