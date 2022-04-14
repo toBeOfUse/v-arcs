@@ -29,8 +29,12 @@
       <input type="text" v-model="text" id="text-for-curve" />
     </label>
     <label for="lines-on">
-      Guidelines visible:
-      <input type="checkbox" v-model="linesOn" />
+      <input type="checkbox" id="lines-on" v-model="linesOn" />
+      Guidelines visible
+    </label>
+    <label for="rotate-letters">
+      <input type="checkbox" id="rotate-letters" v-model="rotateLetters" />
+      Rotate letters
     </label>
   </div>
 </template>
@@ -57,7 +61,8 @@ function renderControlledArc(
   p1: Point,
   p2: Point,
   p3: Point,
-  text: string
+  text: string,
+  rotateLetters: boolean
 ) {
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
@@ -102,16 +107,25 @@ function renderControlledArc(
     ctx.textAlign = "center";
     const chars = Array.from(text);
     let charWidths = chars.map((c) => ctx.measureText(c).width);
-    const totalWidth = charWidths.reduce((acc, v) => acc + v);
+    let totalWidth = charWidths.reduce((acc, v) => acc + v);
     const curve = new Bezier(p1, p2, p3);
     const curveLength = curve.length();
     const textTakesUp = totalWidth / curveLength;
     ctx.font = `${Math.min(500, testFontSize / textTakesUp)}px LivvicBold`;
     charWidths = chars.map((c) => ctx.measureText(c).width);
-    let t = charWidths[0] / 2 / curveLength;
+    totalWidth = charWidths.reduce((acc, v) => acc + v);
+    let t =
+      (curveLength / 2 - totalWidth / 2 + charWidths[0] / 2) / curveLength;
     for (let i = 0; i < chars.length; i++) {
       const coords = curve.get(Math.min(t, 1));
+      if (rotateLetters) {
+        const normal = curve.normal(Math.min(t, 1));
+        ctx.translate(coords.x, coords.y);
+        ctx.rotate((normal.x > 0 ? -1 : 1) * Math.acos(normal.y));
+        ctx.translate(-coords.x, -coords.y);
+      }
       ctx.fillText(chars[i], coords.x, coords.y);
+      ctx.resetTransform();
       if (i < chars.length - 1) {
         t += (charWidths[i] / 2 + charWidths[i + 1] / 2) / curveLength;
       }
@@ -126,6 +140,7 @@ export default defineComponent({
     // these are all placeholders:
     const text = ref("");
     const linesOn = ref(true);
+    const rotateLetters = ref(true);
     const points = reactive<[Point, Point, Point]>([
       { x: 0, y: 0 },
       { x: 0, y: 0 },
@@ -134,10 +149,15 @@ export default defineComponent({
     const nativeRes = reactive<Dimensions>({ width: 0, height: 0 });
     const resScaleFactor = Math.ceil(devicePixelRatio);
 
-    watch([points, text, linesOn], () => {
-      console.log("points change");
-      renderControlledArc(canvas.value, linesOn.value, ...points, text.value);
-    });
+    watch([points, text, linesOn, rotateLetters], () =>
+      renderControlledArc(
+        canvas.value,
+        linesOn.value,
+        ...points,
+        text.value,
+        rotateLetters.value
+      )
+    );
 
     onMounted(() => {
       if (!canvas.value) return;
@@ -192,6 +212,7 @@ export default defineComponent({
       movePoint,
       dropAllPoints,
       linesOn,
+      rotateLetters,
     };
   },
 });
