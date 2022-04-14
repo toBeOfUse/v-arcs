@@ -76,6 +76,7 @@ class HullWalker {
   hull: Hull;
   distanceWalked: number = 0;
   pointAIndex: number = 0;
+  /** just used for logging/debugging */
   history: number[] = [];
   get pointA() {
     return this.hull.points[this.pointAIndex];
@@ -114,21 +115,13 @@ class HullWalker {
   }
   advanceBy(distance: number) {
     let distToGo = distance;
-    console.log("advancing by ", distToGo);
     while (distToGo > 0) {
       const leftInSegment = Hull.distance(this.currentPoint, this.pointB);
-      console.log(leftInSegment, "left in current segment");
       if (distToGo < leftInSegment) {
         this.metaT += distToGo / this.currentSegmentLength;
-        console.log(
-          "proceeding",
-          this.metaT,
-          "far into current segment and exiting"
-        );
         distToGo = 0;
       } else {
         distToGo -= leftInSegment;
-        console.log("moving on into next segment with", distToGo, "left to go");
         if (this.pointBIndex + 1 >= this.hull.points.length) {
           // failsafe for if we've advanced too far
           this.metaT = 1;
@@ -142,7 +135,6 @@ class HullWalker {
     }
     this.distanceWalked += distance;
     this.history.push(this.distanceWalked);
-    console.log(this.history);
   }
 }
 
@@ -247,10 +239,10 @@ export default defineComponent({
   name: "App",
   setup(props) {
     const canvas = ref<null | HTMLCanvasElement>(null);
-    // these are all placeholders:
     const text = ref("");
     const linesOn = ref(true);
     const rotateLetters = ref(true);
+    // these are all placeholders:
     const points = reactive<[Point, Point, Point]>([
       { x: 0, y: 0 },
       { x: 0, y: 0 },
