@@ -54,6 +54,97 @@ interface Dimensions {
   width: number;
   height: number;
 }
+class Hull {
+  readonly points: Point[];
+  readonly length: number;
+  static distance(p1: Point, p2: Point) {
+    return Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
+  }
+  static computeLength(points: Point[]) {
+    let acc = 0;
+    for (let i = 1; i < points.length; i++) {
+      acc += Hull.distance(points[i - 1], points[i]);
+    }
+    return acc;
+  }
+  constructor(points: Point[]) {
+    this.points = points;
+    this.length = Hull.computeLength(points);
+  }
+}
+class HullWalker {
+  hull: Hull;
+  distanceWalked: number = 0;
+  pointAIndex: number = 0;
+  history: number[] = [];
+  get pointA() {
+    return this.hull.points[this.pointAIndex];
+  }
+  pointBIndex: number = 1;
+  get pointB() {
+    return this.hull.points[this.pointBIndex];
+  }
+  metaT: number = 0;
+  static lerp(a: Point, b: Point, metaT: number): Point {
+    return {
+      x: b.x * metaT + a.x * (1 - metaT),
+      y: b.y * metaT + a.y * (1 - metaT),
+    };
+  }
+  get currentPoint() {
+    return HullWalker.lerp(this.pointA, this.pointB, this.metaT);
+  }
+  get currentSegmentLength() {
+    return Hull.distance(this.pointA, this.pointB);
+  }
+  get currentNormal(): Point {
+    const tangent: Point = {
+      x: this.pointB.x - this.pointA.x,
+      y: this.pointB.y - this.pointA.y,
+    };
+    const rotated: Point = {
+      x: -tangent.y,
+      y: tangent.x,
+    };
+    const magnitude = Hull.distance({ x: 0, y: 0 }, rotated);
+    return { x: rotated.x / magnitude, y: rotated.y / magnitude };
+  }
+  constructor(h: Hull) {
+    this.hull = h;
+  }
+  advanceBy(distance: number) {
+    let distToGo = distance;
+    console.log("advancing by ", distToGo);
+    while (distToGo > 0) {
+      const leftInSegment = Hull.distance(this.currentPoint, this.pointB);
+      console.log(leftInSegment, "left in current segment");
+      if (distToGo < leftInSegment) {
+        this.metaT += distToGo / this.currentSegmentLength;
+        console.log(
+          "proceeding",
+          this.metaT,
+          "far into current segment and exiting"
+        );
+        distToGo = 0;
+      } else {
+        distToGo -= leftInSegment;
+        console.log("moving on into next segment with", distToGo, "left to go");
+        if (this.pointBIndex + 1 >= this.hull.points.length) {
+          // failsafe for if we've advanced too far
+          this.metaT = 1;
+          break;
+        } else {
+          this.pointAIndex += 1;
+          this.pointBIndex += 1;
+          this.metaT = 0;
+        }
+      }
+    }
+    this.distanceWalked += distance;
+    this.history.push(this.distanceWalked);
+    console.log(this.history);
+  }
+}
 
 const rectSide = 20;
 function renderControlledArc(
@@ -110,17 +201,35 @@ function renderControlledArc(
     let charWidths = chars.map((c) => ctx.measureText(c).width);
     let totalWidth = charWidths.reduce((acc, v) => acc + v);
     const curve = new Bezier(p1, p2, p3);
-    const curveLength = curve.length();
-    const textTakesUp = totalWidth / curveLength;
+    const hull = new Hull(curve.getLUT(25));
+    // for (const point of hull.points) {
+    //   ctx.fillStyle = "red";
+    //   ctx.beginPath();
+    //   ctx.arc(point.x, point.y, 10, 0, 2 * Math.PI);
+    //   ctx.fill();
+    // }
+    const textTakesUp = totalWidth / hull.length;
     ctx.font = `${Math.min(500, testFontSize / textTakesUp)}px LivvicBold`;
     charWidths = chars.map((c) => ctx.measureText(c).width);
+    const walker = new HullWalker(hull);
     totalWidth = charWidths.reduce((acc, v) => acc + v);
-    let t =
-      (curveLength / 2 - totalWidth / 2 + charWidths[0] / 2) / curveLength;
+    console.log("final text width:", totalWidth);
+    console.log("final hull length:", hull.length);
+    let pos = hull.length / 2 - totalWidth / 2 + charWidths[0] / 2;
+    console.log("starting at position", pos, "along the hull");
     for (let i = 0; i < chars.length; i++) {
-      const coords = curve.get(Math.min(t, 1));
+      walker.advanceBy(pos - walker.distanceWalked);
+      const coords = walker.currentPoint;
+      // if (true) {
+      //   ctx.fillStyle = "red";
+      //   ctx.beginPath();
+      //   ctx.arc(coords.x, coords.y, 10, 0, 2 * Math.PI);
+      //   ctx.fill();
+      //   ctx.fillStyle = "black";
+      // }
+      // const coords = curve.get(Math.min(t, 1));
       if (rotateLetters) {
-        const normal = curve.normal(Math.min(t, 1));
+        const normal = walker.currentNormal;
         ctx.translate(coords.x, coords.y);
         ctx.rotate((normal.x > 0 ? -1 : 1) * Math.acos(normal.y));
         ctx.translate(-coords.x, -coords.y);
@@ -128,7 +237,7 @@ function renderControlledArc(
       ctx.fillText(chars[i], coords.x, coords.y);
       ctx.resetTransform();
       if (i < chars.length - 1) {
-        t += (charWidths[i] / 2 + charWidths[i + 1] / 2) / curveLength;
+        pos += charWidths[i] / 2 + charWidths[i + 1] / 2;
       }
     }
   }
