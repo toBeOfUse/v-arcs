@@ -36,6 +36,7 @@
       <input type="checkbox" id="rotate-letters" v-model="rotateLetters" />
       Rotate letters
     </label>
+    <button @click="downloadPNG">Download PNG</button>
   </div>
 </template>
 
@@ -149,15 +150,15 @@ export default defineComponent({
     const nativeRes = reactive<Dimensions>({ width: 0, height: 0 });
     const resScaleFactor = Math.ceil(devicePixelRatio);
 
-    watch([points, text, linesOn, rotateLetters], () =>
+    const render = () =>
       renderControlledArc(
         canvas.value,
         linesOn.value,
         ...points,
         text.value,
         rotateLetters.value
-      )
-    );
+      );
+    watch([points, text, linesOn, rotateLetters], render);
 
     onMounted(() => {
       if (!canvas.value) return;
@@ -203,6 +204,22 @@ export default defineComponent({
       }
     }
 
+    function downloadPNG() {
+      if (!canvas.value) return;
+      const oldLinesOn = linesOn.value;
+      linesOn.value = false;
+      render();
+      canvas.value.toBlob((blob) => {
+        linesOn.value = oldLinesOn;
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.download = "curve.png";
+        anchor.href = url;
+        anchor.click();
+      }, "png");
+    }
+
     return {
       canvas,
       text,
@@ -214,6 +231,7 @@ export default defineComponent({
       dropAllPoints,
       linesOn,
       rotateLetters,
+      downloadPNG,
     };
   },
 });
