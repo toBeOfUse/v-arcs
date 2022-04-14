@@ -186,6 +186,7 @@ export default defineComponent({
       if (event instanceof MouseEvent) {
         pointer = { x: event.clientX, y: event.clientY };
       } else {
+        event.preventDefault();
         pointer = { x: event.touches[0].clientX, y: event.touches[0].clientY };
       }
       const newPoint = {
@@ -250,5 +251,11 @@ export default defineComponent({
 }
 #controls-row > *:not(:last-child) {
   margin-right: 5px;
+}
+@media (max-width: 700px) {
+  #controls-row {
+    display: flex;
+    flex-direction: column;
+  }
 }
 </style>
