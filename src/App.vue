@@ -67,6 +67,24 @@ class Hull {
     }
     return acc;
   }
+  static computeNormal(pointA: Point, pointB: Point) {
+    const tangent: Point = {
+      x: pointB.x - pointA.x,
+      y: pointB.y - pointA.y,
+    };
+    const rotated: Point = {
+      x: -tangent.y,
+      y: tangent.x,
+    };
+    const magnitude = Hull.distance({ x: 0, y: 0 }, rotated);
+    return { x: rotated.x / magnitude, y: rotated.y / magnitude };
+  }
+  static lerp(a: Point, b: Point, t: number): Point {
+    return {
+      x: b.x * t + a.x * (1 - t),
+      y: b.y * t + a.y * (1 - t),
+    };
+  }
   constructor(points: Point[]) {
     this.points = points;
     this.length = Hull.computeLength(points);
@@ -86,29 +104,39 @@ class HullWalker {
     return this.hull.points[this.pointBIndex];
   }
   metaT: number = 0;
-  static lerp(a: Point, b: Point, metaT: number): Point {
-    return {
-      x: b.x * metaT + a.x * (1 - metaT),
-      y: b.y * metaT + a.y * (1 - metaT),
-    };
-  }
   get currentPoint() {
-    return HullWalker.lerp(this.pointA, this.pointB, this.metaT);
+    return Hull.lerp(this.pointA, this.pointB, this.metaT);
   }
   get currentSegmentLength() {
     return Hull.distance(this.pointA, this.pointB);
   }
   get currentNormal(): Point {
-    const tangent: Point = {
-      x: this.pointB.x - this.pointA.x,
-      y: this.pointB.y - this.pointA.y,
-    };
-    const rotated: Point = {
-      x: -tangent.y,
-      y: tangent.x,
-    };
-    const magnitude = Hull.distance({ x: 0, y: 0 }, rotated);
-    return { x: rotated.x / magnitude, y: rotated.y / magnitude };
+    const baseNormal = Hull.computeNormal(this.pointA, this.pointB);
+    if (this.metaT == 0.5) {
+      return baseNormal;
+    } else if (this.metaT < 0.5) {
+      if (this.pointAIndex == 0) {
+        return baseNormal;
+      } else {
+        const adjacentNormal = Hull.computeNormal(
+          this.hull.points[this.pointAIndex - 1],
+          this.pointA
+        );
+        const normalT = 0.5 + this.metaT;
+        return Hull.lerp(adjacentNormal, baseNormal, normalT);
+      }
+    } else {
+      if (this.pointBIndex == this.hull.points.length - 1) {
+        return baseNormal;
+      } else {
+        const adjacentNormal = Hull.computeNormal(
+          this.pointB,
+          this.hull.points[this.pointBIndex + 1]
+        );
+        const normalT = this.metaT - 0.5;
+        return Hull.lerp(baseNormal, adjacentNormal, normalT);
+      }
+    }
   }
   constructor(h: Hull) {
     this.hull = h;
