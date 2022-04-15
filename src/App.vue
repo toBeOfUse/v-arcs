@@ -274,7 +274,7 @@ export default defineComponent({
   setup(props) {
     const canvas = ref<null | HTMLCanvasElement>(null);
     const text = ref("");
-    const textColor = ref("#ffffff");
+    const textColor = ref("#000000");
     const linesOn = ref(true);
     const rotateLetters = ref(true);
     // these are all placeholders:
