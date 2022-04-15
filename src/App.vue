@@ -28,6 +28,10 @@
       Enter text here:
       <input type="text" v-model="text" id="text-for-curve" />
     </label>
+    <label for="text-color">
+      <input type="color" id="text-color" v-model="textColor" />
+      Text Color
+    </label>
     <label for="lines-on">
       <input type="checkbox" id="lines-on" v-model="linesOn" />
       Guidelines visible
@@ -174,6 +178,7 @@ function renderControlledArc(
   p2: Point,
   p3: Point,
   text: string,
+  textColor: string,
   rotateLetters: boolean
 ) {
   if (!canvas) return;
@@ -237,6 +242,7 @@ function renderControlledArc(
     console.log("final hull length:", hull.length);
     let pos = hull.length / 2 - totalWidth / 2 + charWidths[0] / 2;
     console.log("starting at position", pos, "along the hull");
+    ctx.fillStyle = textColor;
     for (let i = 0; i < chars.length; i++) {
       walker.advanceBy(pos - walker.distanceWalked);
       const coords = walker.currentPoint;
@@ -268,6 +274,7 @@ export default defineComponent({
   setup(props) {
     const canvas = ref<null | HTMLCanvasElement>(null);
     const text = ref("");
+    const textColor = ref("#ffffff");
     const linesOn = ref(true);
     const rotateLetters = ref(true);
     // these are all placeholders:
@@ -285,9 +292,10 @@ export default defineComponent({
         linesOn.value,
         ...points,
         text.value,
+        textColor.value,
         rotateLetters.value
       );
-    watch([points, text, linesOn, rotateLetters], renderCanvas);
+    watch([points, text, linesOn, rotateLetters, textColor], renderCanvas);
 
     onMounted(() => {
       if (!canvas.value) return;
@@ -379,6 +387,7 @@ export default defineComponent({
       linesOn,
       rotateLetters,
       downloadPNG,
+      textColor,
     };
   },
 });
