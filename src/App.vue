@@ -251,7 +251,7 @@ export default defineComponent({
     const nativeRes = reactive<Dimensions>({ width: 0, height: 0 });
     const resScaleFactor = Math.ceil(devicePixelRatio);
 
-    const render = () =>
+    const renderCanvas = () =>
       renderControlledArc(
         canvas.value,
         linesOn.value,
@@ -259,7 +259,7 @@ export default defineComponent({
         text.value,
         rotateLetters.value
       );
-    watch([points, text, linesOn, rotateLetters], render);
+    watch([points, text, linesOn, rotateLetters], renderCanvas);
 
     onMounted(() => {
       if (!canvas.value) return;
@@ -309,7 +309,7 @@ export default defineComponent({
       if (!canvas.value) return;
       const oldLinesOn = linesOn.value;
       linesOn.value = false;
-      render();
+      renderCanvas();
       canvas.value.toBlob((blob) => {
         linesOn.value = oldLinesOn;
         if (!blob) return;
@@ -320,6 +320,17 @@ export default defineComponent({
         anchor.click();
       }, "png");
     }
+
+    new FontFace(
+      "LivvicBold",
+      `url("fonts/livvic-bold-webfont.woff2") format("woff2"),
+        url("fonts/livvic-bold-webfont.woff") format("woff")`
+    )
+      .load()
+      .then((font) => {
+        document.fonts.add(font);
+        renderCanvas();
+      });
 
     return {
       canvas,
@@ -339,13 +350,13 @@ export default defineComponent({
 </script>
 
 <style>
-@font-face {
+/* @font-face {
   font-family: "LivvicBold";
   src: url("./assets/livvic-bold-webfont.woff2") format("woff2"),
     url("./assets/livvic-bold-webfont.woff") format("woff");
   font-weight: normal;
   font-style: normal;
-}
+} */
 @font-face {
   font-family: "LivvicRegular";
   src: url("./assets/livvic-regular-webfont.woff2") format("woff2"),
