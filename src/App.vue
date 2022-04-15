@@ -307,6 +307,11 @@ export default defineComponent({
       top: (p.y / nativeRes.height) * 100 + "%",
     });
 
+    /** groundbreaking, i know */
+    function clamp(value: number, min: number, max: number) {
+      return Math.min(Math.max(value, min), max);
+    }
+
     function movePoint(event: MouseEvent | TouchEvent) {
       const index = points.findIndex((p) => p.moving);
       if (index == -1) return;
@@ -324,6 +329,8 @@ export default defineComponent({
         y: (pointer.y - bbox.top) * resScaleFactor,
         moving: points[index].moving,
       };
+      newPoint.x = clamp(newPoint.x, 5, nativeRes.width - 5);
+      newPoint.y = clamp(newPoint.y, 5, nativeRes.height - 5);
       points[index] = newPoint;
     }
 
