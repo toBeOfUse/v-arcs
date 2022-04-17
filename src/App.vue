@@ -1,11 +1,10 @@
 <template>
   <div
     id="canvas-container"
-    @mouseup="dropAllPoints"
-    @mouseleave="dropAllPoints"
-    @touchend="dropAllPoints"
-    @mousemove="movePoint($event)"
-    @touchmove="movePoint($event)"
+    @mouseup="dragEnd"
+    @touchend="dragEnd"
+    @mousemove="drag"
+    @touchmove="drag"
   >
     <canvas ref="canvas" />
     <div
@@ -13,14 +12,8 @@
       v-for="(point, i) in points"
       :key="i"
       :style="percentify(point)"
-      @mousedown="
-        dropAllPoints();
-        point.moving = true;
-      "
-      @touchstart="
-        dropAllPoints();
-        point.moving = true;
-      "
+      @mousedown="dragStart(i, $event)"
+      @touchstart="dragStart(i, $event)"
     />
   </div>
   <div id="controls-row">
@@ -52,7 +45,7 @@ import { Bezier } from "bezier-js";
 interface Point {
   x: number;
   y: number;
-  moving?: boolean;
+  selected?: boolean;
 }
 interface Dimensions {
   width: number;
@@ -193,24 +186,21 @@ function renderControlledArc(
     ctx.moveTo(p1.x, p1.y);
     ctx.quadraticCurveTo(p2.x, p2.y, p3.x, p3.y);
     ctx.stroke();
-    ctx.strokeRect(
-      p1.x - rectSide / 2,
-      p1.y - rectSide / 2,
+    const points = [p1, p2, p3];
+    const rects: [number, number, number, number][] = points.map((p) => [
+      p.x - rectSide / 2,
+      p.y - rectSide / 2,
       rectSide,
-      rectSide
-    );
-    ctx.strokeRect(
-      p2.x - rectSide / 2,
-      p2.y - rectSide / 2,
       rectSide,
-      rectSide
-    );
-    ctx.strokeRect(
-      p3.x - rectSide / 2,
-      p3.y - rectSide / 2,
-      rectSide,
-      rectSide
-    );
+    ]);
+    ctx.fillStyle = "lightblue";
+    for (let i = 0; i < 3; i++) {
+      ctx.strokeRect(...rects[i]);
+      if (points[i].selected) {
+        ctx.fillRect(...rects[i]);
+      }
+    }
+    ctx.fillStyle = "#000";
     ctx.setLineDash([5, 5]);
     ctx.beginPath();
     ctx.moveTo(p1.x, p1.y);
@@ -320,32 +310,72 @@ export default defineComponent({
       return Math.min(Math.max(value, min), max);
     }
 
-    function movePoint(event: MouseEvent | TouchEvent) {
-      const index = points.findIndex((p) => p.moving);
-      if (index == -1) return;
-      if (!canvas.value) return;
-      const bbox = canvas.value.getBoundingClientRect();
-      let pointer: Point;
-      if (event instanceof MouseEvent) {
-        pointer = { x: event.clientX, y: event.clientY };
+    let pointsMoving = false;
+    let pointsMoved = false;
+    let lastSelectedPoint = 0;
+    let lastDragPos: Point = { x: 0, y: 0 };
+
+    function getDragPos(event: MouseEvent | TouchEvent) {
+      if ("touches" in event) {
+        const touch = event.touches[0];
+        return { x: touch.clientX, y: touch.clientY };
       } else {
-        event.preventDefault();
-        pointer = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+        return { x: event.clientX, y: event.clientY };
       }
-      const newPoint = {
-        x: (pointer.x - bbox.left) * resScaleFactor,
-        y: (pointer.y - bbox.top) * resScaleFactor,
-        moving: points[index].moving,
-      };
-      newPoint.x = clamp(newPoint.x, 5, nativeRes.width - 5);
-      newPoint.y = clamp(newPoint.y, 5, nativeRes.height - 5);
-      points[index] = newPoint;
     }
 
-    function dropAllPoints() {
-      for (const point of points) {
-        point.moving = false;
+    function dragStart(index: number, event: MouseEvent | TouchEvent) {
+      event.preventDefault();
+      pointsMoving = true;
+      lastDragPos = getDragPos(event);
+      lastSelectedPoint = index;
+      if (!event.shiftKey) {
+        if (!points[index].selected) {
+          deselectPoints();
+          points[index].selected = true;
+        }
+      } else {
+        points[index].selected = !points[index].selected;
       }
+    }
+
+    function drag(event: MouseEvent | TouchEvent) {
+      if (!pointsMoving) return;
+      if (!canvas.value) return;
+      event.preventDefault();
+      pointsMoved = true;
+      const pointer = getDragPos(event);
+      const dx = (pointer.x - lastDragPos.x) * resScaleFactor;
+      const dy = (pointer.y - lastDragPos.y) * resScaleFactor;
+      for (const point of points) {
+        if (point.selected) {
+          const newPoint = {
+            x: point.x + dx,
+            y: point.y + dy,
+          };
+          point.x = clamp(newPoint.x, 5, nativeRes.width - 5);
+          point.y = clamp(newPoint.y, 5, nativeRes.height - 5);
+        }
+      }
+      lastDragPos = pointer;
+    }
+
+    function dragEnd(event: MouseEvent) {
+      const onPoint = (event.target as HTMLElement).classList.contains(
+        "control-point"
+      );
+      if (!pointsMoved && !event.shiftKey) {
+        deselectPoints();
+        if (onPoint) {
+          points[lastSelectedPoint].selected = true;
+        }
+      }
+      pointsMoved = false;
+      pointsMoving = false;
+    }
+
+    function deselectPoints() {
+      for (const point of points) point.selected = false;
     }
 
     function downloadPNG() {
@@ -382,8 +412,10 @@ export default defineComponent({
       percentify,
       nativeRes,
       rect: rectSide / devicePixelRatio,
-      movePoint,
-      dropAllPoints,
+      dragStart,
+      drag,
+      dragEnd,
+      deselectPoints,
       linesOn,
       rotateLetters,
       downloadPNG,
